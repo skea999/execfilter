@@ -1,0 +1,24 @@
+[package]
+name = "execfilter"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+description = "LD_PRELOAD shim: strip nixGL/glibc-only environment variables from non-nix child processes"
+license = "ISC"
+build = "build.rs"
+
+[lib]
+name = "execfilter"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1"
+
+[profile.release]
+panic = "abort"
+strip = true
+lto = true
+codegen-units = 1
