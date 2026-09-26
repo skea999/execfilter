@@ -36,11 +36,8 @@ extern "C" {
     static mut environ: *mut *mut c_char;
 }
 
-type ExecveFn = unsafe extern "C" fn(
-    *const c_char,
-    *const *const c_char,
-    *const *const c_char,
-) -> i32;
+type ExecveFn =
+    unsafe extern "C" fn(*const c_char, *const *const c_char, *const *const c_char) -> i32;
 type ExecFn = unsafe extern "C" fn(*const c_char, *const *const c_char) -> i32;
 type SpawnFn = unsafe extern "C" fn(
     *mut libc::pid_t,
@@ -70,7 +67,7 @@ unsafe fn raw_os_str(p: *const c_char) -> Option<&'static OsStr> {
     if p.is_null() {
         return None;
     }
-    Some(OsStr::from_bytes(unsafe { CStr::from_ptr(p) }.as_bytes()))
+    Some(OsStr::from_bytes(unsafe { CStr::from_ptr(p) }.to_bytes()))
 }
 
 /// Does the path belong to the nix world? NULL → false (never panics).
@@ -98,9 +95,7 @@ unsafe fn envp_to_strings(envp: *const *const c_char) -> Option<Vec<OsString>> {
 
 /// Owned filtered environment + raw NULL-terminated pointer array.
 /// None when envp is NULL or nothing needed stripping (pass-through).
-unsafe fn filtered_envp(
-    envp: *const *const c_char,
-) -> Option<(Vec<CString>, Vec<*const c_char>)> {
+unsafe fn filtered_envp(envp: *const *const c_char) -> Option<(Vec<CString>, Vec<*const c_char>)> {
     let vars = unsafe { envp_to_strings(envp) }?;
     let filtered = filter_env_vars(vars.iter().map(OsString::as_os_str));
     // Entries with an interior NUL cannot occur in a real environ; drop them.
@@ -135,7 +130,7 @@ pub unsafe extern "C" fn execve(
         return unsafe { real(path, argv, envp) };
     }
     match unsafe { filtered_envp(envp) } {
-        Some((owned, ptrs)) => unsafe { real(path, argv, ptrs.as_ptr()) },
+        Some((_owned, ptrs)) => unsafe { real(path, argv, ptrs.as_ptr()) },
         None => unsafe { real(path, argv, envp) },
     }
 }
@@ -155,7 +150,7 @@ pub unsafe extern "C" fn execvpe(
         return unsafe { real(file, argv, envp) };
     }
     match unsafe { filtered_envp(envp) } {
-        Some((owned, ptrs)) => unsafe { real(file, argv, ptrs.as_ptr()) },
+        Some((_owned, ptrs)) => unsafe { real(file, argv, ptrs.as_ptr()) },
         None => unsafe { real(file, argv, envp) },
     }
 }
@@ -178,7 +173,9 @@ pub unsafe extern "C" fn posix_spawn(
         return unsafe { real(pid, path, file_actions, attrp, argv, envp) };
     }
     match unsafe { filtered_envp(envp) } {
-        Some((owned, ptrs)) => unsafe { real(pid, path, file_actions, attrp, argv, ptrs.as_ptr()) },
+        Some((_owned, ptrs)) => unsafe {
+            real(pid, path, file_actions, attrp, argv, ptrs.as_ptr())
+        },
         None => unsafe { real(pid, path, file_actions, attrp, argv, envp) },
     }
 }
@@ -201,7 +198,9 @@ pub unsafe extern "C" fn posix_spawnp(
         return unsafe { real(pid, file, file_actions, attrp, argv, envp) };
     }
     match unsafe { filtered_envp(envp) } {
-        Some((owned, ptrs)) => unsafe { real(pid, file, file_actions, attrp, argv, ptrs.as_ptr()) },
+        Some((_owned, ptrs)) => unsafe {
+            real(pid, file, file_actions, attrp, argv, ptrs.as_ptr())
+        },
         None => unsafe { real(pid, file, file_actions, attrp, argv, envp) },
     }
 }
@@ -218,7 +217,7 @@ unsafe fn exec_environ(real: ExecFn, file: *const c_char, argv: *const *const c_
         return unsafe { real(file, argv) };
     }
     let envp = unsafe { environ } as *const *const c_char;
-    let Some((owned, ptrs)) = unsafe { filtered_envp(envp) } else {
+    let Some((_owned, ptrs)) = (unsafe { filtered_envp(envp) }) else {
         return unsafe { real(file, argv) };
     };
     let saved = unsafe { environ };

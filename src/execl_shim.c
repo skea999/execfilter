@@ -37,6 +37,10 @@ static char **collect(const char *arg0, va_list ap)
     return argv;
 }
 
+/* retain (SHF_GNU_RETAIN): the Rust core never references these symbols, so
+ * the linker would otherwise drop them via --gc-sections after the archive
+ * member is pulled in by --whole-archive. */
+__attribute__((retain))
 int execl(const char *path, const char *arg, ...)
 {
     va_list ap;
@@ -48,6 +52,7 @@ int execl(const char *path, const char *arg, ...)
     return execv(path, argv);
 }
 
+__attribute__((retain))
 int execlp(const char *file, const char *arg, ...)
 {
     va_list ap;

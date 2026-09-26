@@ -33,7 +33,10 @@ pub fn is_nix(executable: &OsStr) -> bool {
     if bytes.starts_with(NIX_STORE_PREFIX) {
         return true;
     }
-    if bytes.windows(NIX_PROFILE_MARKER.len()).any(|w| w == NIX_PROFILE_MARKER) {
+    if bytes
+        .windows(NIX_PROFILE_MARKER.len())
+        .any(|w| w == NIX_PROFILE_MARKER)
+    {
         return true;
     }
     // Symlink resolution (~/.nix-profile/bin/dms -> /nix/store/...).
@@ -136,7 +139,7 @@ mod tests {
     #[test]
     fn filter_is_prefix_exact_not_partial() {
         let env = [
-            OsString::from("LD_LIBRARY_PATH=/keep/me"),   // stripped
+            OsString::from("LD_LIBRARY_PATH=/keep/me"),    // stripped
             OsString::from("LD_LIBRARY_PATH_EXTRA=/keep"), // NOT a strip var
             OsString::from("LD_LIBRARY_PATH"),             // no '=' → kept
         ];
