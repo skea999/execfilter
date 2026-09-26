@@ -51,6 +51,9 @@ jobs:
             linker: gcc-aarch64-linux-gnu
     env:
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      # bfd ld rejects rustc's auto version-script + our execl/execlp export
+      # script (two anonymous tags); lld (already the x86_64 default) merges them.
+      RUSTFLAGS: -C link-arg=-fuse-ld=lld
     steps:
       - uses: actions/checkout@v4
 
@@ -58,9 +61,9 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: cross linker (aarch64)
+      - name: cross linker + lld (aarch64)
         if: matrix.linker != ''
-        run: sudo apt-get update && sudo apt-get install -y "$TARGET_LINKER"
+        run: sudo apt-get update && sudo apt-get install -y "$TARGET_LINKER" lld
         env:
           TARGET_LINKER: ${{ matrix.linker }}
 
