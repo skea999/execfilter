@@ -53,7 +53,10 @@ jobs:
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
       # bfd ld rejects rustc's auto version-script + our execl/execlp export
       # script (two anonymous tags); lld (already the x86_64 default) merges them.
-      RUSTFLAGS: -C link-arg=-fuse-ld=lld
+      # Absolute path: cross gcc misses unprefixed ld.lld in its search dirs and
+      # falls back to plain `ld`, which binutils 2.44 no longer installs in
+      # /usr/<triple>/bin -> "collect2: cannot find 'ld'".
+      RUSTFLAGS: -C link-arg=-fuse-ld=/usr/bin/ld.lld
     steps:
       - uses: actions/checkout@v4
 
