@@ -51,12 +51,6 @@ jobs:
             linker: gcc-aarch64-linux-gnu
     env:
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-      # bfd ld rejects rustc's auto version-script + our execl/execlp export
-      # script (two anonymous tags); lld (already the x86_64 default) merges them.
-      # Absolute path: cross gcc misses unprefixed ld.lld in its search dirs and
-      # falls back to plain `ld`, which binutils 2.44 no longer installs in
-      # /usr/<triple>/bin -> "collect2: cannot find 'ld'".
-      RUSTFLAGS: -C link-arg=-fuse-ld=/usr/bin/ld.lld
     steps:
       - uses: actions/checkout@v4
 
@@ -66,12 +60,26 @@ jobs:
 
       - name: cross linker + lld (aarch64)
         if: matrix.linker != ''
-        run: sudo apt-get update && sudo apt-get install -y "$TARGET_LINKER" lld
+        run: |
+          sudo apt-get update && sudo apt-get install -y "$TARGET_LINKER" lld
+          # bfd ld rejects rustc's auto version-script + our execl/execlp export
+          # script (two anonymous tags); lld merges them. Cross gcc's
+          # -fuse-ld=lld lookup needs the triple-prefixed name in PATH, and
+          # binutils 2.44 dropped /usr/<triple>/bin/ld so collect2 cannot even
+          # fall back to plain ld ("cannot find 'ld'").
+          sudo ln -sf "$(command -v ld.lld || ls /usr/bin/ld.lld-* | sort -V | tail -1)" \
+            /usr/local/bin/aarch64-linux-gnu-ld.lld
         env:
           TARGET_LINKER: ${{ matrix.linker }}
 
       - name: build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          # Mirror what rustc auto-adds for x86_64 (self-contained lld shim):
+          # -B<sysroot>/.../gcc-ld makes the driver find `ld.lld` (a wrapper
+          # exec'ing rust-lld) without relying on system ld discovery.
+          sysroot="$(rustc --print sysroot)"
+          export RUSTFLAGS="-C link-arg=-B${sysroot}/lib/rustlib/${{ matrix.target }}/bin/gcc-ld -C link-arg=-fuse-ld=lld"
+          cargo build --release --target ${{ matrix.target }}
 
       - name: exported hooks (must be 8)
         run: |
